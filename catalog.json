@@ -1,0 +1,290 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "2026.09.24.1",
+  "harnesses": [
+    {
+      "id": "claude-code",
+      "displayName": "Claude Code",
+      "vendor": "Anthropic",
+      "status": "supported",
+      "lastReviewed": "2026-09-24",
+      "documentation": [
+        "https://code.claude.com/docs/en/managed-settings",
+        "https://code.claude.com/docs/en/managed-mcp",
+        "https://code.claude.com/docs/en/settings-reference"
+      ],
+      "notes": "Mimir writes the file-based managed tier. An MDM profile for com.anthropic.claudecode ranks above the file and, with the default managedSourcesBehavior 'first-wins', hides Mimir's file completely. Deploy settings for Claude Code through Mimir only.",
+      "conflictingPreferenceDomains": ["com.anthropic.claudecode"],
+      "outputs": [
+        {
+          "id": "managed-settings",
+          "path": "/Library/Application Support/ClaudeCode/managed-settings.json",
+          "format": "json",
+          "description": "Managed settings (highest file-based precedence; users cannot override).",
+          "mergeRules": [
+            { "path": "permissions.allow", "strategy": "union" },
+            { "path": "permissions.ask", "strategy": "union" },
+            { "path": "permissions.deny", "strategy": "union", "denies": "permissions.allow" },
+            { "path": "allowedMcpServers", "strategy": "union" },
+            { "path": "deniedMcpServers", "strategy": "union", "denies": "allowedMcpServers", "matchField": "serverName" },
+            { "path": "availableModels", "strategy": "union" },
+            { "path": "allowManagedMcpServersOnly", "strategy": "anyTrue" },
+            { "path": "allowManagedHooksOnly", "strategy": "anyTrue" },
+            { "path": "allowManagedPermissionRulesOnly", "strategy": "anyTrue" },
+            { "path": "strictKnownMarketplaces", "strategy": "union" },
+            { "path": "cleanupPeriodDays", "strategy": "min" }
+          ]
+        },
+        {
+          "id": "managed-mcp",
+          "path": "/Library/Application Support/ClaudeCode/managed-mcp.json",
+          "format": "json",
+          "description": "Organisation-provided MCP servers ({\"mcpServers\": {name: config}}).",
+          "mergeRules": [
+            { "path": "mimirDeniedServers", "strategy": "union", "denies": "mcpServers" }
+          ],
+          "internalKeys": ["mimirDeniedServers"]
+        }
+      ],
+      "detect": {
+        "executables": [
+          "~/.local/bin/claude",
+          "~/.claude/local/claude",
+          "~/Library/Application Support/Claude/claude-code/*/claude.app/Contents/MacOS/claude",
+          "~/.npm-global/bin/claude",
+          "/opt/homebrew/bin/claude",
+          "/usr/local/bin/claude"
+        ],
+        "processNames": ["claude"],
+        "userConfigPaths": ["~/.claude/settings.json", "~/.claude.json"]
+      }
+    },
+    {
+      "id": "claude-desktop",
+      "displayName": "Claude Desktop",
+      "vendor": "Anthropic",
+      "status": "experimental",
+      "lastReviewed": "2026-09-24",
+      "documentation": [
+        "https://support.claude.com/en/articles/12622667-enterprise-configuration-for-claude-desktop",
+        "https://support.claude.com/en/articles/12611117-deploy-claude-desktop-for-macos"
+      ],
+      "notes": "Claude Desktop only reads the com.anthropic.claudefordesktop managed-preferences domain; there is no file-based alternative. Mimir writes that plist in /Library/Managed Preferences directly, which Apple does not document for third parties: macOS may remove it when profiles change, and Mimir restores it within seconds. Do not also deploy a vendor profile for this domain. Claude Desktop reads policy at launch; users must restart the app.",
+      "outputs": [
+        {
+          "id": "managed-preferences",
+          "path": "/Library/Managed Preferences/com.anthropic.claudefordesktop.plist",
+          "format": "plist",
+          "description": "Enterprise policy keys for Claude Desktop.",
+          "jsonEncodedKeys": ["allowedWorkspaceFolders", "managedMcpServers"],
+          "mergeRules": [
+            { "path": "allowedWorkspaceFolders", "strategy": "union" },
+            { "path": "isLocalDevMcpEnabled", "strategy": "anyFalse" },
+            { "path": "isDesktopExtensionEnabled", "strategy": "anyFalse" },
+            { "path": "isDesktopExtensionDirectoryEnabled", "strategy": "anyFalse" },
+            { "path": "isClaudeCodeForDesktopEnabled", "strategy": "anyFalse" },
+            { "path": "secureVmFeaturesEnabled", "strategy": "anyFalse" },
+            { "path": "disableAutoUpdates", "strategy": "anyTrue" },
+            { "path": "autoUpdaterEnforcementHours", "strategy": "min" }
+          ]
+        }
+      ],
+      "detect": {
+        "appBundleIDs": ["com.anthropic.claudefordesktop"],
+        "userConfigPaths": ["~/Library/Application Support/Claude/claude_desktop_config.json"]
+      }
+    },
+    {
+      "id": "opencode",
+      "displayName": "opencode",
+      "vendor": "SST / Anomaly",
+      "status": "supported",
+      "lastReviewed": "2026-09-24",
+      "documentation": ["https://opencode.ai/docs/config/"],
+      "notes": "Mimir writes the system managed config, which overrides global, project and remote (.well-known/opencode) config. An MDM profile for ai.opencode.managed also overrides everything and conflicts with Mimir's output.",
+      "conflictingPreferenceDomains": ["ai.opencode.managed"],
+      "outputs": [
+        {
+          "id": "managed-config",
+          "path": "/Library/Application Support/opencode/opencode.json",
+          "format": "json",
+          "description": "Managed opencode.json (keys: mcp, permission, provider, model, disabled_providers, enabled_providers, share, autoupdate, …).",
+          "mergeRules": [
+            { "path": "enabled_providers", "strategy": "union" },
+            { "path": "disabled_providers", "strategy": "union", "denies": "enabled_providers" },
+            { "path": "instructions", "strategy": "union" }
+          ]
+        }
+      ],
+      "detect": {
+        "executables": [
+          "~/.opencode/bin/opencode",
+          "~/.npm-global/bin/opencode",
+          "/opt/homebrew/bin/opencode",
+          "/usr/local/bin/opencode"
+        ],
+        "processNames": ["opencode"],
+        "userConfigPaths": ["~/.config/opencode/opencode.json", "~/.config/opencode/opencode.jsonc"]
+      }
+    },
+    {
+      "id": "codex",
+      "displayName": "OpenAI Codex CLI",
+      "vendor": "OpenAI",
+      "status": "supported",
+      "lastReviewed": "2026-09-24",
+      "documentation": [
+        "https://learn.chatgpt.com/docs/enterprise/managed-configuration",
+        "https://developers.openai.com/codex/config-reference"
+      ],
+      "notes": "requirements.toml holds hard constraints users cannot change; managed_config.toml holds managed defaults. Cloud-managed requirements (ChatGPT Business/Enterprise) and an MDM profile for com.openai.codex rank above these files.",
+      "conflictingPreferenceDomains": ["com.openai.codex"],
+      "outputs": [
+        {
+          "id": "requirements",
+          "path": "/etc/codex/requirements.toml",
+          "format": "toml",
+          "description": "Admin-enforced requirements (allowed_approval_policies, allowed_sandbox_modes, mcp_servers, features, …).",
+          "mergeRules": [
+            { "path": "allowed_approval_policies", "strategy": "union" },
+            { "path": "allowed_sandbox_modes", "strategy": "union" },
+            { "path": "allowed_login_methods", "strategy": "union" },
+            { "path": "allowed_chatgpt_workspaces", "strategy": "union" }
+          ]
+        },
+        {
+          "id": "managed-config",
+          "path": "/etc/codex/managed_config.toml",
+          "format": "toml",
+          "description": "Managed defaults layered above the user's config.toml."
+        }
+      ],
+      "detect": {
+        "executables": [
+          "~/.npm-global/bin/codex",
+          "~/.local/bin/codex",
+          "/opt/homebrew/bin/codex",
+          "/usr/local/bin/codex"
+        ],
+        "processNames": ["codex"],
+        "userConfigPaths": ["~/.codex/config.toml"]
+      }
+    },
+    {
+      "id": "gemini-cli",
+      "displayName": "Gemini CLI",
+      "vendor": "Google",
+      "status": "planned",
+      "lastReviewed": "2026-09-24",
+      "documentation": ["https://geminicli.com/docs/cli/enterprise/"],
+      "notes": "System overrides at /Library/Application Support/GeminiCli/settings.json and defaults at system-defaults.json in the same folder. Good fit for the next release.",
+      "outputs": [],
+      "detect": {
+        "executables": ["~/.npm-global/bin/gemini", "/opt/homebrew/bin/gemini", "/usr/local/bin/gemini"],
+        "processNames": ["gemini"],
+        "userConfigPaths": ["~/.gemini/settings.json"]
+      }
+    },
+    {
+      "id": "github-copilot-cli",
+      "displayName": "GitHub Copilot CLI",
+      "vendor": "GitHub",
+      "status": "planned",
+      "lastReviewed": "2026-09-24",
+      "documentation": ["https://docs.github.com/en/copilot/reference/mcp-allowlist-enforcement"],
+      "notes": "Enterprise policy (allowedMcpServers / deniedMcpServers) lives in copilot/managed-settings.json of the org's .github-private repository, not on the device. Mimir can inventory it; a local managed file needs research.",
+      "outputs": [],
+      "detect": {
+        "executables": ["~/.npm-global/bin/copilot", "/opt/homebrew/bin/copilot", "/usr/local/bin/copilot"],
+        "processNames": ["copilot"],
+        "userConfigPaths": ["~/.copilot/config.json", "~/.copilot/mcp-config.json"]
+      }
+    },
+    {
+      "id": "cursor",
+      "displayName": "Cursor",
+      "vendor": "Anysphere",
+      "status": "planned",
+      "lastReviewed": "2026-09-24",
+      "documentation": [
+        "https://cursor.com/docs/enterprise/model-and-integration-management",
+        "https://cursor.com/docs/enterprise/deployment-patterns"
+      ],
+      "notes": "MCP allowlists are managed in the Enterprise team dashboard; ~/.cursor/permissions.json (mcpAllowlist) is user-level. Needs research on device-level policy.",
+      "outputs": [],
+      "detect": {
+        "appBundleIDs": ["com.todesktop.230313mzl4w4u92"],
+        "userConfigPaths": ["~/.cursor/mcp.json", "~/.cursor/permissions.json"]
+      }
+    },
+    {
+      "id": "vscode-copilot",
+      "displayName": "VS Code (GitHub Copilot Chat)",
+      "vendor": "Microsoft",
+      "status": "planned",
+      "lastReviewed": "2026-09-24",
+      "documentation": ["https://code.visualstudio.com/docs/setup/enterprise"],
+      "notes": "VS Code reads enterprise policies (e.g. ChatAllowedMcpServers) from the com.microsoft.VSCode managed-preferences domain at startup.",
+      "outputs": [],
+      "detect": {
+        "appBundleIDs": ["com.microsoft.VSCode"],
+        "userConfigPaths": ["~/Library/Application Support/Code/User/mcp.json"]
+      }
+    },
+    {
+      "id": "windsurf",
+      "displayName": "Windsurf / Devin Desktop",
+      "vendor": "Cognition",
+      "status": "planned",
+      "lastReviewed": "2026-09-24",
+      "documentation": ["https://docs.windsurf.com/windsurf/enterprise-policies"],
+      "notes": "Supports MDM enterprise policies on macOS; key names need research.",
+      "outputs": [],
+      "detect": {
+        "appBundleIDs": ["com.exafunction.windsurf"],
+        "userConfigPaths": ["~/.codeium/windsurf/mcp_config.json"]
+      }
+    },
+    {
+      "id": "goose",
+      "displayName": "goose",
+      "vendor": "Block / AAIF",
+      "status": "planned",
+      "lastReviewed": "2026-09-24",
+      "documentation": ["https://goose-docs.ai/docs/guides/config-files/"],
+      "notes": "Only user-level YAML config (~/.config/goose/config.yaml). Needs a YAML writer and a per-user output mode.",
+      "outputs": [],
+      "detect": {
+        "appBundleIDs": ["com.block.goose"],
+        "executables": ["~/.local/bin/goose", "/opt/homebrew/bin/goose", "/usr/local/bin/goose"],
+        "processNames": ["goose"],
+        "userConfigPaths": ["~/.config/goose/config.yaml"]
+      }
+    },
+    {
+      "id": "cline",
+      "displayName": "Cline",
+      "vendor": "Cline Bot",
+      "status": "planned",
+      "lastReviewed": "2026-09-24",
+      "documentation": ["https://docs.cline.bot/enterprise-solutions/configuration/remote-configuration/litellm/admin-configuration"],
+      "notes": "Enterprise policy (allowedMCPServers, yoloModeAllowed) is delivered via Cline's remote config, not a device file. Runs as a VS Code extension.",
+      "outputs": [],
+      "detect": {
+        "userConfigPaths": ["~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"]
+      }
+    },
+    {
+      "id": "claw-code",
+      "displayName": "claw-code",
+      "vendor": "Community",
+      "status": "planned",
+      "lastReviewed": "2026-09-24",
+      "notes": "Open-source agent harness. Configuration and enterprise mechanisms not yet researched.",
+      "outputs": [],
+      "detect": {
+        "processNames": ["claw"]
+      }
+    }
+  ]
+}
