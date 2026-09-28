@@ -41,6 +41,12 @@ The private key is kept offline and never used in CI.
 | `goose` | goose | planned |
 | `cline` | Cline | planned |
 | `claw-code` | claw-code | planned |
+| `kiro-cli` | Kiro CLI | planned |
+| `droid-cli` | Droid CLI | planned |
+| `amp-cli` | Amp CLI | planned |
+| `warp` | Warp (Agent Mode) | planned |
+| `muse-code` | Muse Code | planned |
+| `crush` | Crush | planned |
 
 ## Updating
 
