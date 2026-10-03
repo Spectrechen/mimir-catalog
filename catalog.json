@@ -52,6 +52,7 @@
           "~/.local/bin/claude",
           "~/.claude/local/claude",
           "~/Library/Application Support/Claude/claude-code/*/claude.app/Contents/MacOS/claude",
+          "~/Library/Application Support/Claude/claude-code/*/*/claude.app/Contents/MacOS/claude",
           "~/.npm-global/bin/claude",
           "/opt/homebrew/bin/claude",
           "/usr/local/bin/claude"
