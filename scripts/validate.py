@@ -9,7 +9,7 @@ ALLOWED_PREFIXES = (
     "/etc/codex/",
     "/Library/Managed Preferences/com.anthropic.claudefordesktop.plist",
 )
-STRATEGIES = {"union", "replace", "anyTrue", "anyFalse", "min", "max"}
+STRATEGIES = {"union", "replace", "anyTrue", "anyFalse", "min", "max", "intersect", "strictest"}
 STATUSES = {"supported", "experimental", "planned"}
 FORMATS = {"json", "toml", "plist"}
 
@@ -17,7 +17,7 @@ def fail(msg):
     print("error:", msg); sys.exit(1)
 
 cat = json.load(open(sys.argv[1] if len(sys.argv) > 1 else "catalog.json"))
-if cat.get("schemaVersion") != 1: fail("schemaVersion must be 1")
+if cat.get("schemaVersion") not in (1, 2): fail("schemaVersion must be 1 or 2")
 if not re.fullmatch(r"\d{4}\.\d{2}\.\d{2}\.\d+", cat.get("catalogVersion", "")): fail("catalogVersion must be YYYY.MM.DD.N")
 ids = set()
 for h in cat["harnesses"]:
@@ -39,4 +39,5 @@ for h in cat["harnesses"]:
             fail(f"{hid}/{o['id']}: path {p} is not in Mimir's built-in allowlist")
         for r in o.get("mergeRules", []):
             if "strategy" in r and r["strategy"] not in STRATEGIES: fail(f"{hid}/{o['id']}: bad strategy {r['strategy']}")
+            if r.get("strategy") == "strictest" and not r.get("order"): fail(f"{hid}/{o['id']}: strictest rule {r['path']} needs an order")
 print(f"ok: {len(ids)} harnesses, version {cat['catalogVersion']}")

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "catalogVersion": "2026.09.24.1",
   "harnesses": [
     {
@@ -27,11 +27,12 @@
             { "path": "permissions.deny", "strategy": "union", "denies": "permissions.allow" },
             { "path": "allowedMcpServers", "strategy": "union" },
             { "path": "deniedMcpServers", "strategy": "union", "denies": "allowedMcpServers", "matchField": "serverName" },
-            { "path": "availableModels", "strategy": "union" },
+            { "path": "availableModels", "strategy": "intersect" },
             { "path": "allowManagedMcpServersOnly", "strategy": "anyTrue" },
             { "path": "allowManagedHooksOnly", "strategy": "anyTrue" },
             { "path": "allowManagedPermissionRulesOnly", "strategy": "anyTrue" },
-            { "path": "strictKnownMarketplaces", "strategy": "union" },
+            { "path": "strictKnownMarketplaces", "strategy": "intersect" },
+            { "path": "permissions.disableBypassPermissionsMode", "strategy": "strictest", "order": ["disable"] },
             { "path": "cleanupPeriodDays", "strategy": "min" }
           ]
         },
@@ -51,6 +52,7 @@
           "~/.local/bin/claude",
           "~/.claude/local/claude",
           "~/Library/Application Support/Claude/claude-code/*/claude.app/Contents/MacOS/claude",
+          "~/Library/Application Support/Claude/claude-code/*/*/claude.app/Contents/MacOS/claude",
           "~/.npm-global/bin/claude",
           "/opt/homebrew/bin/claude",
           "/usr/local/bin/claude"
@@ -78,7 +80,7 @@
           "description": "Enterprise policy keys for Claude Desktop.",
           "jsonEncodedKeys": ["allowedWorkspaceFolders", "managedMcpServers"],
           "mergeRules": [
-            { "path": "allowedWorkspaceFolders", "strategy": "union" },
+            { "path": "allowedWorkspaceFolders", "strategy": "intersect" },
             { "path": "isLocalDevMcpEnabled", "strategy": "anyFalse" },
             { "path": "isDesktopExtensionEnabled", "strategy": "anyFalse" },
             { "path": "isDesktopExtensionDirectoryEnabled", "strategy": "anyFalse" },
@@ -110,9 +112,11 @@
           "format": "json",
           "description": "Managed opencode.json (keys: mcp, permission, provider, model, disabled_providers, enabled_providers, share, autoupdate, …).",
           "mergeRules": [
-            { "path": "enabled_providers", "strategy": "union" },
+            { "path": "enabled_providers", "strategy": "intersect" },
             { "path": "disabled_providers", "strategy": "union", "denies": "enabled_providers" },
-            { "path": "instructions", "strategy": "union" }
+            { "path": "instructions", "strategy": "union" },
+            { "path": "share", "strategy": "strictest", "order": ["disabled", "manual", "auto"] },
+            { "path": "permission.*", "strategy": "strictest", "order": ["deny", "ask", "allow"] }
           ]
         }
       ],
@@ -146,17 +150,21 @@
           "format": "toml",
           "description": "Admin-enforced requirements (allowed_approval_policies, allowed_sandbox_modes, mcp_servers, features, …).",
           "mergeRules": [
-            { "path": "allowed_approval_policies", "strategy": "union" },
-            { "path": "allowed_sandbox_modes", "strategy": "union" },
-            { "path": "allowed_login_methods", "strategy": "union" },
-            { "path": "allowed_chatgpt_workspaces", "strategy": "union" }
+            { "path": "allowed_approval_policies", "strategy": "intersect" },
+            { "path": "allowed_sandbox_modes", "strategy": "intersect" },
+            { "path": "allowed_login_methods", "strategy": "intersect" },
+            { "path": "allowed_chatgpt_workspaces", "strategy": "intersect" }
           ]
         },
         {
           "id": "managed-config",
           "path": "/etc/codex/managed_config.toml",
           "format": "toml",
-          "description": "Managed defaults layered above the user's config.toml."
+          "description": "Managed defaults layered above the user's config.toml.",
+          "mergeRules": [
+            { "path": "approval_policy", "strategy": "strictest", "order": ["untrusted", "on-request", "on-failure", "never"] },
+            { "path": "sandbox_mode", "strategy": "strictest", "order": ["read-only", "workspace-write", "danger-full-access"] }
+          ]
         }
       ],
       "detect": {
