@@ -7,13 +7,13 @@
       "displayName": "Claude Code",
       "vendor": "Anthropic",
       "status": "supported",
-      "lastReviewed": "2026-09-24",
+      "lastReviewed": "2026-09-28",
       "documentation": [
         "https://code.claude.com/docs/en/managed-settings",
         "https://code.claude.com/docs/en/managed-mcp",
         "https://code.claude.com/docs/en/settings-reference"
       ],
-      "notes": "Mimir writes the file-based managed tier. An MDM profile for com.anthropic.claudecode ranks above the file and, with the default managedSourcesBehavior 'first-wins', hides Mimir's file completely. Deploy settings for Claude Code through Mimir only.",
+      "notes": "Mimir writes the file-based managed tier. An MDM profile for com.anthropic.claudecode ranks above the file and, with the default managedSourcesBehavior 'first-wins', hides Mimir's file completely. Deploy settings for Claude Code through Mimir only. Since v2.1.242, setting managedSourcesBehavior to 'merge' in the highest-ranked source (the MDM profile) makes Claude Code compose every admin source instead of hiding lower ones — an org that wants both an MDM profile and Mimir's file applied must opt in there, not in Mimir's file.",
       "conflictingPreferenceDomains": ["com.anthropic.claudecode"],
       "outputs": [
         {
@@ -27,10 +27,16 @@
             { "path": "permissions.deny", "strategy": "union", "denies": "permissions.allow" },
             { "path": "allowedMcpServers", "strategy": "union" },
             { "path": "deniedMcpServers", "strategy": "union", "denies": "allowedMcpServers", "matchField": "serverName" },
+            { "path": "managedMcpServers", "strategy": "union" },
             { "path": "availableModels", "strategy": "intersect" },
+            { "path": "deniedModels", "strategy": "union", "denies": "availableModels" },
             { "path": "allowManagedMcpServersOnly", "strategy": "anyTrue" },
             { "path": "allowManagedHooksOnly", "strategy": "anyTrue" },
             { "path": "allowManagedPermissionRulesOnly", "strategy": "anyTrue" },
+            { "path": "allowAllClaudeAiMcps", "strategy": "anyFalse" },
+            { "path": "disableClaudeAiConnectors", "strategy": "anyTrue" },
+            { "path": "disableSideloadFlags", "strategy": "anyTrue" },
+            { "path": "blockedMarketplaces", "strategy": "union" },
             { "path": "strictKnownMarketplaces", "strategy": "intersect" },
             { "path": "permissions.disableBypassPermissionsMode", "strategy": "strictest", "order": ["disable"] },
             { "path": "cleanupPeriodDays", "strategy": "min" }
@@ -136,21 +142,22 @@
       "displayName": "OpenAI Codex CLI",
       "vendor": "OpenAI",
       "status": "supported",
-      "lastReviewed": "2026-09-24",
+      "lastReviewed": "2026-09-28",
       "documentation": [
-        "https://learn.chatgpt.com/docs/enterprise/managed-configuration",
+        "https://developers.openai.com/codex/enterprise/managed-configuration",
         "https://developers.openai.com/codex/config-reference"
       ],
-      "notes": "requirements.toml holds hard constraints users cannot change; managed_config.toml holds managed defaults. Cloud-managed requirements (ChatGPT Business/Enterprise) and an MDM profile for com.openai.codex rank above these files.",
+      "notes": "requirements.toml holds hard constraints users cannot change (deployed locally or via an MDM profile for com.openai.codex using the requirements_toml_base64 key); managed_config.toml holds managed defaults the user can still override at runtime (MDM key config_toml_base64). Precedence is requirements.toml > cloud-managed configuration defaults (ChatGPT Business/Enterprise) > managed_config.toml. allowed_sandbox_modes is now documented as legacy; Codex ≥ 0.138.0 prefers allowed_permission_profiles, where any profile omitted from the list (including future built-ins) is denied.",
       "conflictingPreferenceDomains": ["com.openai.codex"],
       "outputs": [
         {
           "id": "requirements",
           "path": "/etc/codex/requirements.toml",
           "format": "toml",
-          "description": "Admin-enforced requirements (allowed_approval_policies, allowed_sandbox_modes, mcp_servers, features, …).",
+          "description": "Admin-enforced requirements (allowed_approval_policies, allowed_permission_profiles, allowed_sandbox_modes [legacy], features, …).",
           "mergeRules": [
             { "path": "allowed_approval_policies", "strategy": "intersect" },
+            { "path": "allowed_permission_profiles", "strategy": "intersect" },
             { "path": "allowed_sandbox_modes", "strategy": "intersect" },
             { "path": "allowed_login_methods", "strategy": "intersect" },
             { "path": "allowed_chatgpt_workspaces", "strategy": "intersect" }
@@ -160,10 +167,11 @@
           "id": "managed-config",
           "path": "/etc/codex/managed_config.toml",
           "format": "toml",
-          "description": "Managed defaults layered above the user's config.toml.",
+          "description": "Managed defaults layered above the user's config.toml (approval_policy, sandbox_mode, otel telemetry block, check_for_update_on_startup, …).",
           "mergeRules": [
             { "path": "approval_policy", "strategy": "strictest", "order": ["untrusted", "on-request", "on-failure", "never"] },
-            { "path": "sandbox_mode", "strategy": "strictest", "order": ["read-only", "workspace-write", "danger-full-access"] }
+            { "path": "sandbox_mode", "strategy": "strictest", "order": ["read-only", "workspace-write", "danger-full-access"] },
+            { "path": "check_for_update_on_startup", "strategy": "anyFalse" }
           ]
         }
       ],
@@ -183,9 +191,14 @@
       "displayName": "Gemini CLI",
       "vendor": "Google",
       "status": "planned",
-      "lastReviewed": "2026-09-24",
-      "documentation": ["https://geminicli.com/docs/cli/enterprise/"],
-      "notes": "System overrides at /Library/Application Support/GeminiCli/settings.json and defaults at system-defaults.json in the same folder. Good fit for the next release.",
+      "lastReviewed": "2026-09-28",
+      "documentation": [
+        "https://geminicli.com/docs/cli/enterprise/",
+        "https://geminicli.com/docs/reference/policy-engine/",
+        "https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/enterprise.md",
+        "https://github.com/google-gemini/gemini-cli/blob/main/docs/reference/policy-engine.md"
+      ],
+      "notes": "CONFIRMED device-level mechanism, genuine candidate for 'supported'. Casing confirmed exact: system overrides at /Library/Application Support/GeminiCli/settings.json, defaults at system-defaults.json in the same folder (env override: GEMINI_CLI_SYSTEM_SETTINGS_PATH). Precedence System overrides > Workspace > User > System defaults (arrays/objects merge rather than replace). Keys: tools.core (array, tool/command allowlist -> union), tools.sandbox (string enforce e.g. 'docker'), mcp.allowed (array MCP allowlist -> union) + mcpServers (canonical server defs, admins should ship both together so users can't add unlisted servers), telemetry.enabled / telemetry.logPrompts (bool kill switches -> anyFalse), privacy.usageStatisticsEnabled (bool -> anyFalse), security.disableYoloMode (bool lock -> anyTrue), security.auth.enforcedType (string, last/admin wins). There is also a separate TOML policy engine ([[rule]] with toolName/decision/priority) loaded from Admin dirs: /Library/Application Support/GeminiCli/policies on macOS (/etc/gemini-cli/policies Linux, C:\\ProgramData\\gemini-cli\\policies Windows) - Admin tier always outranks Default/Extension/Workspace/User tiers. Recommend promoting to supported.",
       "outputs": [],
       "detect": {
         "executables": ["~/.npm-global/bin/gemini", "/opt/homebrew/bin/gemini", "/usr/local/bin/gemini"],
@@ -198,9 +211,16 @@
       "displayName": "GitHub Copilot CLI",
       "vendor": "GitHub",
       "status": "planned",
-      "lastReviewed": "2026-09-24",
-      "documentation": ["https://docs.github.com/en/copilot/reference/mcp-allowlist-enforcement"],
-      "notes": "Enterprise policy (allowedMcpServers / deniedMcpServers) lives in copilot/managed-settings.json of the org's .github-private repository, not on the device. Mimir can inventory it; a local managed file needs research.",
+      "lastReviewed": "2026-09-28",
+      "documentation": [
+        "https://docs.github.com/en/copilot/reference/mcp-allowlist-enforcement",
+        "https://docs.github.com/en/copilot/how-tos/administer-copilot/manage-for-enterprise/manage-agents/configure-enterprise-managed-settings",
+        "https://docs.github.com/en/copilot/reference/enterprise-managed-settings-reference",
+        "https://github.blog/changelog/2026-07-08-deploy-managed-copilot-settings-via-mdm-in-vs-code-and-cli/",
+        "https://github.blog/changelog/2026-07-01-enterprise-managed-settings-json-is-generally-available/"
+      ],
+      "notes": "CHANGED since last review: a genuine on-device mechanism now exists (GA 2026-07-01, extended to CLI/VS Code 2026-07-08) making this a strong candidate for 'supported'. Two device-level channels, both read by Copilot CLI: (1) native MDM managed preferences for the com.github.copilot domain (macOS profile; Windows equivalent HKLM\\SOFTWARE\\Policies\\GitHubCopilot); (2) file-based deployment at /Library/Application Support/GitHubCopilot/managed-settings.json on macOS (/etc/github-copilot/managed-settings.json on Linux) - file must be owned by root, not group/world-writable, no symlinks; client restart required to reload. Precedence: MDM-managed > server-managed (org's copilot/managed-settings.json in .github-private, legacy path .github/copilot/settings.json) > file-based > user's own ~/.copilot/config.json. Keys: allowedMcpServers (array -> intersection across managed-settings layers; treat as allow-list intersection, not plain union), deniedMcpServers (array -> union, denies win over allow), model (string, last/highest-precedence layer wins - not mergeable), permissions.disableBypassPermissionsMode (enum/bool lock -> anyTrue/'disable' wins, suppresses --yolo/--allow-all flags), permissions.allow / permissions.ask / permissions.deny (arrays, deny wins), enabledPlugins (array, additive across enterprise+team layers -> union), extraKnownMarketplaces / strictKnownMarketplaces (registry restriction, most-restrictive wins). Caveat: GitHub issue github/copilot-cli#4959 shows the managed 'model' key was not reliably applied in non-interactive CLI runs (-p/piped stdin) as of CLI 1.0.89-1 (2026-09) - a known bug, not a documentation gap; interactive sessions honor it. Recommend promoting to supported once that CLI bug is confirmed fixed, or shipping the file-based /Library/Application Support/GitHubCopilot/managed-settings.json output now with a note about the interactive-only model-key caveat.",
+      "conflictingPreferenceDomains": ["com.github.copilot"],
       "outputs": [],
       "detect": {
         "executables": ["~/.npm-global/bin/copilot", "/opt/homebrew/bin/copilot", "/usr/local/bin/copilot"],
@@ -213,12 +233,13 @@
       "displayName": "Cursor",
       "vendor": "Anysphere",
       "status": "planned",
-      "lastReviewed": "2026-09-24",
+      "lastReviewed": "2026-09-28",
       "documentation": [
         "https://cursor.com/docs/enterprise/model-and-integration-management",
-        "https://cursor.com/docs/enterprise/deployment-patterns"
+        "https://cursor.com/docs/enterprise/deployment-patterns",
+        "https://cursor.com/docs/reference/permissions"
       ],
-      "notes": "MCP allowlists are managed in the Enterprise team dashboard; ~/.cursor/permissions.json (mcpAllowlist) is user-level. Needs research on device-level policy.",
+      "notes": "CHANGED since last review: cursor.com/docs/enterprise/deployment-patterns now documents a genuine device-level mechanism — a macOS .mobileconfig configuration profile (a reference profile for the current bundle ID, com.todesktop.230313mzl4w4u92, ships inside Cursor.app's own Resources), deployable via Jamf/Kandji/Intune or by hand. Documented keys include AllowedExtensions, AllowedTeamId, WorkspaceTrustEnabled, UpdateMode, NetworkDisableHttp2 and ExtensionGalleryServiceUrl, each overriding user/workspace settings outright (no union semantics documented at this layer). ~/.cursor/permissions.json (mcpAllowlist) remains the MCP allow-list surface, but docs now say it can also be dropped in place by MDM at the device level, not just edited by the user. Candidate for 'supported' once the full key list and merge semantics inside the shipped .mobileconfig are read directly from a live environment (this run relied on search snippets, not a full page fetch).",
       "outputs": [],
       "detect": {
         "appBundleIDs": ["com.todesktop.230313mzl4w4u92"],
@@ -230,12 +251,16 @@
       "displayName": "VS Code (GitHub Copilot Chat)",
       "vendor": "Microsoft",
       "status": "planned",
-      "lastReviewed": "2026-09-24",
-      "documentation": ["https://code.visualstudio.com/docs/setup/enterprise"],
-      "notes": "VS Code reads enterprise policies (e.g. ChatAllowedMcpServers) from the com.microsoft.VSCode managed-preferences domain at startup.",
+      "lastReviewed": "2026-09-28",
+      "documentation": [
+        "https://code.visualstudio.com/docs/setup/enterprise",
+        "https://github.com/microsoft/vscode-docs/blob/main/docs/enterprise/policies.md",
+        "https://github.blog/changelog/2026-07-08-deploy-managed-copilot-settings-via-mdm-in-vs-code-and-cli/"
+      ],
+      "notes": "VS Code reads its own enterprise policies from the com.microsoft.VSCode managed-preferences domain at startup: ChatAllowedMcpServers / ChatDeniedMcpServers (deny wins) / ChatAllowManagedMcpServersOnly (lock), a chat.mcp.access kill switch, TelemetryLevel, EnableFeedback, ExtensionsAutoUpdateDelay, ChatApprovedAccountOrganizations, and UpdateMode/ExtensionsAutoUpdate. VS Code Insiders reads a separate domain, com.microsoft.VSCodeInsiders. Separately (and layered on top, per GitHub's 2026-07-08 changelog), GitHub's own com.github.copilot MDM domain / GitHubCopilot managed-settings.json — see the github-copilot-cli entry — now also applies to the Copilot Chat extension inside VS Code. Needs research on precedence between VS Code's native policy and GitHub's newer managed-settings layer before promoting to 'supported'.",
       "outputs": [],
       "detect": {
-        "appBundleIDs": ["com.microsoft.VSCode"],
+        "appBundleIDs": ["com.microsoft.VSCode", "com.microsoft.VSCodeInsiders"],
         "userConfigPaths": ["~/Library/Application Support/Code/User/mcp.json"]
       }
     },
@@ -244,9 +269,12 @@
       "displayName": "Windsurf / Devin Desktop",
       "vendor": "Cognition",
       "status": "planned",
-      "lastReviewed": "2026-09-24",
-      "documentation": ["https://docs.windsurf.com/windsurf/enterprise-policies"],
-      "notes": "Supports MDM enterprise policies on macOS; key names need research.",
+      "lastReviewed": "2026-09-28",
+      "documentation": [
+        "https://docs.windsurf.com/windsurf/enterprise-policies",
+        "https://docs.devin.ai/desktop/enterprise-policies"
+      ],
+      "notes": "CHANGED since last review: Cognition rebranded Windsurf to Devin Desktop on 2026-06-02 (same app, same com.exafunction.windsurf bundle ID kept for compatibility); canonical docs moved to docs.devin.ai/desktop/enterprise-policies, which docs.windsurf.com/windsurf/enterprise-policies still mirrors. That page confirms a device-level mechanism: a macOS .mobileconfig configuration profile, with a sample shipped inside the app bundle, deployable via MDM or by hand — separate from VS Code's own policy surface. Search snippets suggest keys for an MCP server allowlist, a managed-MCP-only lock, and telemetry/feedback toggles, but this run could not fetch the live page directly (egress-blocked) to confirm exact key names/types, so no mergeRules are added yet. Needs one direct read of docs.devin.ai/desktop/enterprise-policies before promoting to 'supported'.",
       "outputs": [],
       "detect": {
         "appBundleIDs": ["com.exafunction.windsurf"],
@@ -292,6 +320,102 @@
       "outputs": [],
       "detect": {
         "processNames": ["claw"]
+      }
+    },
+    {
+      "id": "kiro-cli",
+      "displayName": "Kiro CLI",
+      "vendor": "AWS",
+      "status": "planned",
+      "lastReviewed": "2026-09-28",
+      "documentation": [
+        "https://kiro.dev/docs/cli/",
+        "https://kiro.dev/docs/enterprise/managed-updates/",
+        "https://kiro.dev/docs/enterprise/settings/"
+      ],
+      "notes": "New entry. Kiro CLI is AWS's rebrand of Amazon Q Developer CLI (CLI rebranded 2026-11-17; Amazon Q Developer reaches end of support 2027-04-30, and legacy ~/.aws/amazonq/ data auto-migrates to ~/.kiro/ on install). Enterprise docs describe update and settings management, and a managed preference domain (referenced as dev.kiro.cli in update-related docs) usable via MDM, but this run could not confirm an exact macOS managed-settings file path/domain or its policy keys from an official source — needs research before adding outputs.",
+      "outputs": [],
+      "detect": {
+        "executables": ["/opt/homebrew/bin/kiro", "/usr/local/bin/kiro"],
+        "processNames": ["kiro"],
+        "userConfigPaths": ["~/.kiro/settings/cli.json", "~/.kiro/settings/mcp.json"]
+      }
+    },
+    {
+      "id": "droid-cli",
+      "displayName": "Droid CLI",
+      "vendor": "Factory AI",
+      "status": "planned",
+      "lastReviewed": "2026-09-28",
+      "documentation": ["https://docs.factory.ai/cli/getting-started/quickstart", "https://factory.ai/product/cli"],
+      "notes": "New entry. Terminal coding agent from Factory AI; installed via install script, Homebrew cask (droid) or npm. Settings at ~/.factory/settings.json with a ~/.factory/settings.local.json override and a project-level .factory/settings.local.json. No device-level admin/MDM mechanism found in the docs surfaced this run — needs research.",
+      "outputs": [],
+      "detect": {
+        "executables": ["~/.npm-global/bin/droid", "/opt/homebrew/bin/droid", "/usr/local/bin/droid"],
+        "processNames": ["droid"],
+        "userConfigPaths": ["~/.factory/settings.json", "~/.factory/settings.local.json"]
+      }
+    },
+    {
+      "id": "amp-cli",
+      "displayName": "Amp CLI",
+      "vendor": "Sourcegraph",
+      "status": "planned",
+      "lastReviewed": "2026-09-28",
+      "documentation": ["https://ampcode.com/manual", "https://ampcode.com/news/towards-a-new-cli", "https://github.com/sourcegraph/amp-examples-and-guides"],
+      "notes": "New entry. Terminal coding agent from Sourcegraph; npm package @ampcode/cli (formerly @sourcegraph/amp, still supported), now a single-file Bun-compiled executable. Global config at ~/.config/amp/settings.json (overridable via the AMP_SETTINGS_FILE env var); workspace .amp/settings.json overrides it except keymaps. Enterprise-workspace settings like amp.commands.allowlist appear to be cloud/workspace-managed, not a macOS device-level file — needs research before this is a managed-config candidate.",
+      "outputs": [],
+      "detect": {
+        "executables": ["~/.npm-global/bin/amp", "/opt/homebrew/bin/amp", "/usr/local/bin/amp"],
+        "processNames": ["amp"],
+        "userConfigPaths": ["~/.config/amp/settings.json"]
+      }
+    },
+    {
+      "id": "warp",
+      "displayName": "Warp (Agent Mode)",
+      "vendor": "Warp",
+      "status": "planned",
+      "lastReviewed": "2026-09-28",
+      "documentation": [
+        "https://docs.warp.dev/terminal/settings/",
+        "https://docs.warp.dev/agent-platform/warp-agents/interacting-with-agents/terminal-and-agent-modes",
+        "https://docs.warp.dev/enterprise/team-management/admin-panel/"
+      ],
+      "notes": "New entry. Native macOS terminal with a built-in Agent Mode. User settings live in ~/.warp/settings.toml (TOML, not JSON). Enterprise policy (agent autonomy, model allowlists, secret redaction, sharing) is enforced through a cloud-based Admin Panel for teams, not a macOS device-level MDM profile or managed-preferences domain — not a managed-config candidate until an on-device mechanism is documented. App bundle ID not confirmed from an official source this run, so omitted from detect.",
+      "outputs": [],
+      "detect": {
+        "userConfigPaths": ["~/.warp/settings.toml"]
+      }
+    },
+    {
+      "id": "muse-code",
+      "displayName": "Muse Code",
+      "vendor": "Meta",
+      "status": "planned",
+      "lastReviewed": "2026-09-28",
+      "documentation": ["https://developer.meta.com/ai/products/muse-code/", "https://dev.meta.ai/docs/muse-code"],
+      "notes": "New entry. Meta's coding agent CLI (beta 2026-08-05, GA 2026-08-31), running on the Muse Spark model; installed via a curl install script producing a `muse` binary. Docs reference `muse config validate --plane <defaults|policy>` and a `managed_hooks_path`, suggesting an admin policy mechanism exists, but this run could not confirm an exact macOS managed-config file path/domain from an official source — needs research before adding outputs.",
+      "outputs": [],
+      "detect": {
+        "executables": ["~/.local/bin/muse", "/opt/homebrew/bin/muse", "/usr/local/bin/muse"],
+        "processNames": ["muse"],
+        "userConfigPaths": ["~/.muse-code/config.json", "~/.config/muse/settings.json"]
+      }
+    },
+    {
+      "id": "crush",
+      "displayName": "Crush",
+      "vendor": "Charm",
+      "status": "planned",
+      "lastReviewed": "2026-09-28",
+      "documentation": ["https://github.com/charmbracelet/crush"],
+      "notes": "New entry. Open-source terminal coding agent (TUI) from Charm; installed via Homebrew (charmbracelet/tap/crush) or npm (@charmland/crush). Config is a project/global crush.json (schema at charm.land/crush.json). No enterprise/MDM mechanism documented — individual-developer tool as of this review.",
+      "outputs": [],
+      "detect": {
+        "executables": ["~/.npm-global/bin/crush", "/opt/homebrew/bin/crush", "/usr/local/bin/crush"],
+        "processNames": ["crush"],
+        "userConfigPaths": ["~/.config/crush/crush.json"]
       }
     }
   ]
