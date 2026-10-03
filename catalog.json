@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "2026.09.24.1",
+  "catalogVersion": "2026.10.03.1",
   "harnesses": [
     {
       "id": "claude-code",
