@@ -47,6 +47,10 @@ The private key is kept offline and never used in CI.
 | `warp` | Warp (Agent Mode) | planned |
 | `muse-code` | Muse Code | planned |
 | `crush` | Crush | planned |
+| `qwen-code` | Qwen Code | planned |
+| `aider` | Aider | planned |
+| `auggie-cli` | Auggie CLI | planned |
+| `openhands` | OpenHands | planned |
 
 ## Updating
 
