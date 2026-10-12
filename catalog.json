@@ -7,13 +7,13 @@
       "displayName": "Claude Code",
       "vendor": "Anthropic",
       "status": "supported",
-      "lastReviewed": "2026-10-05",
+      "lastReviewed": "2026-10-12",
       "documentation": [
         "https://code.claude.com/docs/en/managed-settings",
         "https://code.claude.com/docs/en/managed-mcp",
         "https://code.claude.com/docs/en/settings-reference"
       ],
-      "notes": "Mimir writes the file-based managed tier. An MDM profile for com.anthropic.claudecode ranks above the file and, with the default managedSourcesBehavior 'first-wins', hides Mimir's file completely. Deploy settings for Claude Code through Mimir only. Since v2.1.242, setting managedSourcesBehavior to 'merge' in the highest-ranked source (the MDM profile) makes Claude Code compose every admin source instead of hiding lower ones — an org that wants both an MDM profile and Mimir's file applied must opt in there, not in Mimir's file. Claude Code also reads a managed-settings.d/*.json drop-in directory alongside managed-settings.json, merged alphabetically (scalars last-wins, lists union+dedupe, nested blocks merge-by-field); Mimir does not write into that directory yet. New keys confirmed this review: allowedProviders, requiredMinimumVersion/requiredMaximumVersion, maxEffortLevel, disableAllHooks, allowedHttpHookUrls/httpHookAllowedEnvVars, sandbox.network.allowManagedDomainsOnly, sandbox.filesystem.allowManagedReadPathsOnly, strictPluginOnlyCustomization, and allowClaudeInChromeWithManagedMcp (a grant that loosens a default block — defaulted to anyFalse since unsure, so any source withholding it keeps the feature blocked).",
+      "notes": "Mimir writes the file-based managed tier. An MDM profile for com.anthropic.claudecode ranks above the file and, with the default managedSourcesBehavior 'first-wins', hides Mimir's file completely. Deploy settings for Claude Code through Mimir only. Since v2.1.242, setting managedSourcesBehavior to 'merge' in the highest-ranked source (the MDM profile) makes Claude Code compose every admin source instead of hiding lower ones — an org that wants both an MDM profile and Mimir's file applied must opt in there, not in Mimir's file. Claude Code also reads a managed-settings.d/*.json drop-in directory alongside managed-settings.json; Mimir does not write into that directory yet. CONFIRMED this review (raw fetch): drop-in files merge alphabetically after managed-settings.json — plain scalars last-file-wins, lists union+dedupe, nested blocks merge key-by-key, but fallbackModel, managedMcpServers, extraKnownMarketplaces and modelPicker are replaced whole by the later file rather than merged. Also confirmed: the allowedProviders cross-source merge now requires Claude Code >= v2.1.285 to take effect. No new top-level mergeRule keys found this review beyond the ones already modeled below. Docs also reference several more keys (allowedChannelPlugins, channelsEnabled, disableCommandPluginSources, parentSettingsBehavior, policyHelper, forceRemoteSettingsRefresh, crossSessionInbound, enableArtifact) whose exact types/semantics were not pinned down with a quote this review — left out of mergeRules pending a follow-up pass that confirms their types (see PR 'Unverified').",
       "conflictingPreferenceDomains": ["com.anthropic.claudecode"],
       "outputs": [
         {
@@ -83,13 +83,13 @@
       "displayName": "Claude Desktop",
       "vendor": "Anthropic",
       "status": "experimental",
-      "lastReviewed": "2026-10-05",
+      "lastReviewed": "2026-10-12",
       "documentation": [
         "https://support.claude.com/en/articles/12622667-enterprise-configuration-for-claude-desktop",
         "https://support.claude.com/en/articles/12611117-deploy-claude-desktop-for-macos",
         "https://claude.com/docs/third-party/claude-desktop/configuration"
       ],
-      "notes": "Claude Desktop only reads the com.anthropic.claudefordesktop managed-preferences domain; there is no file-based alternative. Mimir writes that plist in /Library/Managed Preferences directly, which Apple does not document for third parties: macOS may remove it when profiles change, and Mimir restores it within seconds. Do not also deploy a vendor profile for this domain. Claude Desktop reads policy at launch; users must restart the app. CHANGED since last review: vendor docs describe managed preferences as read per-user (/Library/Managed Preferences/<user>/com.anthropic.claudefordesktop.plist), not the single device-wide file Mimir's compiled-in allowlist and this catalog's output path model — needs a Mimir change, see PR notes. Vendor docs also list many more managed keys than previously catalogued; this review only adds requireCoworkFullVmSandbox (cross-confirmed from the Claude Code docs too). The rest were seen in a lower-confidence source (summarized, not raw HTML) and are deliberately left out pending a direct-fetch confirmation pass.",
+      "notes": "Claude Desktop only reads the com.anthropic.claudefordesktop managed-preferences domain; there is no file-based alternative. Mimir writes that plist in /Library/Managed Preferences directly, which Apple does not document for third parties: macOS may remove it when profiles change, and Mimir restores it within seconds. Do not also deploy a vendor profile for this domain. Claude Desktop reads policy at launch; users must restart the app. CONFIRMED this review via two direct raw fetches of https://claude.com/docs/third-party/claude-desktop/configuration: the plist is documented as read PER-USER, literally '/Library/Managed Preferences/<user>/com.anthropic.claudefordesktop.plist', not the single device-wide path Mimir currently writes and this entry's output models — Mimir needs to write (or additionally write) the per-user path before this policy is reliably read; see PR 'Needs Mimir change'. Same raw fetch confirmed exact types for several more keys, added below: builtinBrowserAllowedDomains, sshHostAllowlist and coworkEgressAllowedHosts are string[] restriction allowlists; blockReadsOutsideWorkingDirectories and disableBypassPermissionsMode are boolean kill switches; disabledBuiltinTools is a string[] deny list; builtinToolPolicy is a per-tool allow/ask/blocked map. Two more confirmed keys were left out as not policy-relevant: organizationInstructions (free-text model guidance, not an enforced control) and inferenceModels (overrides the auto-discovered model list wholesale, not a restriction). requireCoworkFullVmSandbox is now marked Deprecated in the vendor table with no replacement key confirmed yet — kept here since deprecated keys typically still function during a migration window; recheck next review. Docs also note a 2026-10-07 migration cutoff after which several renamed/legacy key forms fail closed (not catalog-relevant directly, but explains default-behavior changes for anyone still on old key names).",
       "outputs": [
         {
           "id": "managed-preferences",
@@ -106,7 +106,14 @@
             { "path": "secureVmFeaturesEnabled", "strategy": "anyFalse" },
             { "path": "disableAutoUpdates", "strategy": "anyTrue" },
             { "path": "autoUpdaterEnforcementHours", "strategy": "min" },
-            { "path": "requireCoworkFullVmSandbox", "strategy": "anyTrue" }
+            { "path": "requireCoworkFullVmSandbox", "strategy": "anyTrue" },
+            { "path": "builtinBrowserAllowedDomains", "strategy": "intersect" },
+            { "path": "sshHostAllowlist", "strategy": "intersect" },
+            { "path": "coworkEgressAllowedHosts", "strategy": "intersect" },
+            { "path": "blockReadsOutsideWorkingDirectories", "strategy": "anyTrue" },
+            { "path": "disableBypassPermissionsMode", "strategy": "anyTrue" },
+            { "path": "disabledBuiltinTools", "strategy": "union" },
+            { "path": "builtinToolPolicy.*", "strategy": "strictest", "order": ["blocked", "ask", "allow"] }
           ]
         }
       ],
@@ -236,16 +243,17 @@
       "displayName": "GitHub Copilot CLI",
       "vendor": "GitHub",
       "status": "planned",
-      "lastReviewed": "2026-10-05",
+      "lastReviewed": "2026-10-12",
       "documentation": [
         "https://docs.github.com/en/copilot/reference/mcp-allowlist-enforcement",
         "https://docs.github.com/en/copilot/how-tos/administer-copilot/manage-for-enterprise/manage-agents/configure-enterprise-managed-settings",
         "https://docs.github.com/en/copilot/reference/enterprise-managed-settings-reference",
         "https://github.blog/changelog/2026-07-08-deploy-managed-copilot-settings-via-mdm-in-vs-code-and-cli/",
         "https://github.blog/changelog/2026-07-01-enterprise-managed-settings-json-is-generally-available/",
-        "https://github.com/github/docs/blob/main/content/copilot/reference/enterprise-administrators/enterprise-managed-settings.md"
+        "https://github.com/github/docs/blob/main/content/copilot/reference/enterprise-administrators/enterprise-managed-settings.md",
+        "https://github.com/github/copilot-cli/blob/main/changelog.md"
       ],
-      "notes": "CHANGED since last review: a genuine on-device mechanism now exists (GA 2026-07-01, extended to CLI/VS Code 2026-07-08) making this a strong candidate for 'supported'. Two device-level channels, both read by Copilot CLI: (1) native MDM managed preferences for the com.github.copilot domain (macOS profile, string values only with dot-separated nested keys and JSON-encoded arrays/objects; Windows equivalent HKLM\\SOFTWARE\\Policies\\GitHubCopilot); (2) file-based deployment at /Library/Application Support/GitHubCopilot/managed-settings.json on macOS (/etc/github-copilot/managed-settings.json on Linux, no native MDM on Linux) - file must be owned by root, not group/world-writable, no symlinks; client restart required to reload. Precedence: MDM-managed > server-managed (org's copilot/managed-settings.json in .github-private, legacy path .github/copilot/settings.json) > file-based > user's own ~/.copilot/config.json — EXCEPT sandbox and permissions.deny/ask/allow, which vendor docs say are composed in the most restrictive direction across delivery methods regardless of this precedence. Keys, re-confirmed directly from github/docs source this review: allowedMcpServers is vendor-documented, verbatim, as intersect ('a server must be permitted by every source to run'); permissions.allow is likewise documented as intersect, not union — same non-obvious stricter-than-expected pattern; deniedMcpServers and permissions.deny/ask are union, deny always wins; permissions.disableBypassPermissionsMode is a string enum ('disable'/'unmanaged'), not a boolean, but still anyTrue-shaped (any source setting 'disable' wins); model (string, top-level key now supersedes legacy permissions.model, last/highest-precedence layer wins); enabledPlugins (union); extraKnownMarketplaces/strictKnownMarketplaces (most-restrictive wins). New keys found this review: autoTier (ordered tier, strictest wins), remoteControl, a richer telemetry object (enabled/endpoint/protocol/captureContent/lockCaptureContent/…), features.computerUse (anyFalse kill switch), and a {\"overridable\": value} wrapper on many keys enabling enterprise-vs-team-level overrides — a merge dimension not yet modeled here. Caveat still open as of 2026-10-01: GitHub issue github/copilot-cli#4959 shows the managed 'model' key is not reliably applied in non-interactive CLI runs (-p/piped stdin) as of CLI 1.0.89-1 - a known, unresolved bug, not a documentation gap; interactive sessions honor it. Recommend promoting to supported once that CLI bug is confirmed fixed, or shipping the file-based /Library/Application Support/GitHubCopilot/managed-settings.json output now with a note about the interactive-only model-key caveat.",
+      "notes": "CHANGED since last review: a genuine on-device mechanism now exists (GA 2026-07-01, extended to CLI/VS Code 2026-07-08) making this a strong candidate for 'supported'. Two device-level channels, both read by Copilot CLI: (1) native MDM managed preferences for the com.github.copilot domain (macOS profile, string values only with dot-separated nested keys and JSON-encoded arrays/objects; Windows equivalent HKLM\\SOFTWARE\\Policies\\GitHubCopilot); (2) file-based deployment at /Library/Application Support/GitHubCopilot/managed-settings.json on macOS (/etc/github-copilot/managed-settings.json on Linux, no native MDM on Linux) - file must be owned by root, not group/world-writable, no symlinks; client restart required to reload. Precedence: MDM-managed > server-managed (org's copilot/managed-settings.json in .github-private, legacy path .github/copilot/settings.json) > file-based > user's own ~/.copilot/config.json — EXCEPT sandbox and permissions.deny/ask/allow, which vendor docs say are composed in the most restrictive direction across delivery methods regardless of this precedence. Keys, re-confirmed directly from github/docs source this review: allowedMcpServers is vendor-documented, verbatim, as intersect ('a server must be permitted by every source to run'); permissions.allow is likewise documented as intersect, not union — same non-obvious stricter-than-expected pattern; deniedMcpServers and permissions.deny/ask are union, deny always wins; permissions.disableBypassPermissionsMode is a string enum ('disable'/'unmanaged'), not a boolean, but still anyTrue-shaped (any source setting 'disable' wins); model (string, top-level key now supersedes legacy permissions.model, last/highest-precedence layer wins); enabledPlugins (union); extraKnownMarketplaces/strictKnownMarketplaces (most-restrictive wins). NEW this review (CLI 1.0.93, 2026-10-07, confirmed from the official changelog.md): permissions.limitTo — a network-domain allowlist ('enforce managed domain boundaries for network requests'; only Domain(...) entries valid, an empty list denies all) that sits alongside permissions.allow/deny/ask with deny still winning — same restriction-allowlist family as allowedMcpServers, so intersect. Carried-forward open research items (key names not yet pinned to an exact quote): autoTier, remoteControl, a richer telemetry object, features.computerUse, an {\"overridable\": value} wrapper, an 'Assisted Permissions' kill switch and a minimum-CLI-version key referenced in changelog 1.0.94 (2026-10-08) but not yet confirmed by exact JSON key name. Caveat still open: GitHub issue github/copilot-cli#4959 (managed 'model' key not reliably applied in non-interactive CLI runs) re-confirmed OPEN as of 2026-10-12 (desktop app v1.1.25 bug confirmed Oct 1, triaged Oct 5, no maintainer fix yet) — this still blocks promoting to 'supported'. Recommend promoting to supported once that CLI bug is fixed, or shipping the file-based /Library/Application Support/GitHubCopilot/managed-settings.json output now with a note about the interactive-only model-key caveat.",
       "conflictingPreferenceDomains": ["com.github.copilot"],
       "outputs": [],
       "detect": {
@@ -259,13 +267,13 @@
       "displayName": "Cursor",
       "vendor": "Anysphere",
       "status": "planned",
-      "lastReviewed": "2026-10-05",
+      "lastReviewed": "2026-10-12",
       "documentation": [
         "https://cursor.com/docs/enterprise/model-and-integration-management",
         "https://cursor.com/docs/enterprise/deployment-patterns",
         "https://cursor.com/docs/reference/permissions"
       ],
-      "notes": "CHANGED since last review: cursor.com/docs/enterprise/deployment-patterns now documents a genuine device-level mechanism — a macOS .mobileconfig configuration profile (a reference profile for the current bundle ID, com.todesktop.230313mzl4w4u92, ships inside Cursor.app's own Resources), deployable via Jamf/Kandji/Intune or by hand. Documented keys include AllowedExtensions, AllowedTeamId, WorkspaceTrustEnabled, UpdateMode, NetworkDisableHttp2 and ExtensionGalleryServiceUrl, each overriding user/workspace settings outright (no union semantics documented at this layer). CORRECTED this review: the MCP allow-list surface actually has two paths, not one — ~/.cursor/permissions.json (user) AND <workspace>/.cursor/permissions.json (per-repo) — and vendor docs describe them as concatenated/combined across scopes (mcpAllowlist -> union), not override; either can also be dropped in place by MDM at the device level. Candidate for 'supported' once the full key list and merge semantics inside the shipped .mobileconfig are read directly from a live environment (this run was again unable to get a direct page fetch of cursor.com, only corroborating search snippets).",
+      "notes": "CHANGED since last review: cursor.com/docs/enterprise/deployment-patterns now documents a genuine device-level mechanism — a macOS .mobileconfig configuration profile (a reference profile for the current bundle ID, com.todesktop.230313mzl4w4u92, ships inside Cursor.app's own Resources), deployable via Jamf/Kandji/Intune or by hand. Documented keys include AllowedExtensions, AllowedTeamId, WorkspaceTrustEnabled, UpdateMode, NetworkDisableHttp2 and ExtensionGalleryServiceUrl, each overriding user/workspace settings outright (no union semantics documented at this layer). CORRECTED this review: the MCP allow-list surface actually has two paths, not one — ~/.cursor/permissions.json (user) AND <workspace>/.cursor/permissions.json (per-repo) — and vendor docs describe them as concatenated/combined across scopes (mcpAllowlist -> union), not override; either can also be dropped in place by MDM at the device level. CAUTION added this review: cursor.com remains unreachable for a direct fetch (every attempt — apex, docs subdomain, .md variants — failed again); a Cursor-staff forum reply (forum.cursor.com, June 2026) says the real .mobileconfig profile schema only supports AllowedExtensions/AllowedTeamId/ExtensionGalleryServiceUrl/UpdateMode, casting doubt on whether WorkspaceTrustEnabled and NetworkDisableHttp2 are genuine profile keys versus marketing copy — not changed in this catalog pending a direct-fetch confirmation, but flagged here and in the PR. Multiple October 2026 forum bug reports also claim the permissions.json user+repo merge/wildcard matching is broken in practice. Candidate for 'supported' once the full key list and merge semantics inside the shipped .mobileconfig are read directly from a live environment.",
       "outputs": [],
       "detect": {
         "appBundleIDs": ["com.todesktop.230313mzl4w4u92"],
@@ -277,13 +285,14 @@
       "displayName": "VS Code (GitHub Copilot Chat)",
       "vendor": "Microsoft",
       "status": "planned",
-      "lastReviewed": "2026-10-05",
+      "lastReviewed": "2026-10-12",
       "documentation": [
         "https://code.visualstudio.com/docs/setup/enterprise",
         "https://github.com/microsoft/vscode-docs/blob/main/docs/enterprise/policies.md",
+        "https://github.com/microsoft/vscode-docs/blob/main/docs/enterprise/manage-ai-settings.md",
         "https://github.blog/changelog/2026-07-08-deploy-managed-copilot-settings-via-mdm-in-vs-code-and-cli/"
       ],
-      "notes": "Re-verified this review by fetching github.com/microsoft/vscode-docs' raw policies.md directly: VS Code's chat/MCP policy surface is much larger than previously catalogued (~28 chat/MCP-adjacent policies, not 8) and 'chat.mcp.access' is actually the VS Code *setting id* that the policy named ChatMCP maps to, not a policy name itself. Confirmed directly: policy values override the setting at every level (default/user/workspace), and ChatAgentDeniedNetworkDomains explicitly takes precedence over ChatAgentAllowedNetworkDomains (deny wins). Other policy-relevant keys worth modeling if promoted: ChatAllowedMcpServers/ChatDeniedMcpServers (deny wins), ChatAllowManagedMcpServersOnly (lock), ChatAgentSandboxEnabled/AllowNetwork/AllowUnsandboxedCommands, TelemetryLevel, EnableFeedback, ExtensionsAutoUpdateDelay, ChatApprovedAccountOrganizations, UpdateMode/ExtensionsAutoUpdate. VS Code Insiders reads a separate domain, com.microsoft.VSCodeInsiders (unconfirmed this review). Separately (and layered on top, per GitHub's 2026-07-08 changelog), GitHub's own com.github.copilot MDM domain / GitHubCopilot managed-settings.json — see the github-copilot-cli entry — now also applies to the Copilot Chat extension inside VS Code. Precedence between VS Code's native chat.* policy and GitHub's managed-settings layer is still not documented anywhere official; needs research before promoting to 'supported'.",
+      "notes": "RESOLVED this review (direct source reads of microsoft/vscode-docs and github/docs): the long-open precedence question between VS Code's native chat.* policy and GitHub's com.github.copilot managed-settings layer is now answered by a new page, docs/enterprise/manage-ai-settings.md (dated 2026-10-07): 'If both systems configure the same control, the enterprise-managed setting takes precedence. The values are not merged.' Full cross-channel order: MDM-managed settings > server-managed settings > file-based settings > user settings, EXCEPT permissions.deny/ask/allow and sandbox, which are composed in the most restrictive direction across all of them regardless of that order. github/docs' enterprise-managed-settings.md and deploy-managed-settings.md also give the full VS Code-supported key table for GitHub's own com.github.copilot domain: permissions.disableBypassPermissionsMode (kill switch), permissions.allow (intersect)/deny/ask (union, deny wins), allowedMcpServers (intersect)/deniedMcpServers (union, deny wins), sandbox (limit, requires VS Code Agent Host >= 1.138.0), telemetry, model/autoTier (enum). Separately, VS Code's own native com.microsoft.VSCode policy surface (policies.md, re-fetched) grew since last review: new keys include ChatStrictPluginOnlyCustomization, ChatAllowManagedHooksOnly, ChatPluginsEnabled/ChatEnabledPlugins/ChatExtraMarketplaces/ChatStrictMarketplaces, Claude3PIntegration, Codex3PIntegration, 8 CopilotOtel* telemetry keys, McpEnterpriseManagedAuthIdp, BrowserChatTools, ChatDefaultModel, and several Dictation* keys, alongside the previously-catalogued ChatAllowedMcpServers/ChatDeniedMcpServers/ChatAllowManagedMcpServersOnly/ChatAgentSandboxEnabled-etc./TelemetryLevel/EnableFeedback/ExtensionsAutoUpdateDelay/ChatApprovedAccountOrganizations/UpdateMode/ExtensionsAutoUpdate. com.microsoft.VSCodeInsiders remains a separate, still-unconfirmed domain. With both the full key list and the cross-layer precedence now confirmed from official sources, this is a strong 'supported' candidate — see PR 'Candidates for supported'. No output added yet: the mechanism is a native MDM managed-preferences domain (plist), and /Library/Managed Preferences/com.microsoft.VSCode.plist is not yet in Mimir's path allowlist — see PR 'Needs Mimir change'.",
       "outputs": [],
       "detect": {
         "appBundleIDs": ["com.microsoft.VSCode", "com.microsoft.VSCodeInsiders"],
@@ -328,12 +337,15 @@
       "displayName": "Cline",
       "vendor": "Cline Bot",
       "status": "planned",
-      "lastReviewed": "2026-09-24",
-      "documentation": ["https://docs.cline.bot/enterprise-solutions/configuration/remote-configuration/litellm/admin-configuration"],
-      "notes": "Enterprise policy (allowedMCPServers, yoloModeAllowed) is delivered via Cline's remote config, not a device file. Runs as a VS Code extension.",
+      "lastReviewed": "2026-10-12",
+      "documentation": ["https://docs.cline.bot/enterprise-solutions/configuration/remote-configuration/litellm/admin-configuration", "https://docs.cline.bot/cli/configuration"],
+      "notes": "Enterprise policy is delivered via Cline's remote/cloud config, not a device file; not a 'supported' candidate. CONFIRMED this review via WebSearch-quoted text from docs.cline.bot (still blocked for a direct fetch): remote-config keys include mcpMarketplaceEnabled, allowedMCPServers, remoteMCPServers, blockPersonalRemoteMCPServers and the previously-noted yoloModeAllowed kill switch, all cloud-delivered. Also confirmed: Cline now ships a standalone CLI (separate from the VS Code extension) that stores its own data under ~/.cline/data/, with MCP settings at ~/.cline/data/settings/cline_mcp_settings.json (overridable via the CLINE_DIR env var) — a different path from the VS Code extension's globalStorage path already in detect below. Added the CLI path as an additional discovery hint; no admin mechanism writes to either path.",
       "outputs": [],
       "detect": {
-        "userConfigPaths": ["~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"]
+        "userConfigPaths": [
+          "~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json",
+          "~/.cline/data/settings/cline_mcp_settings.json"
+        ]
       }
     },
     {
@@ -353,18 +365,18 @@
       "displayName": "Kiro CLI",
       "vendor": "AWS",
       "status": "planned",
-      "lastReviewed": "2026-10-05",
+      "lastReviewed": "2026-10-12",
       "documentation": [
         "https://kiro.dev/docs/cli/",
         "https://kiro.dev/docs/enterprise/managed-updates/",
         "https://kiro.dev/docs/enterprise/settings/"
       ],
-      "notes": "CORRECTED this review: Kiro CLI is AWS's rebrand of Amazon Q Developer CLI; secondary sources place the rebrand at 2025-11-17, not 2026-11-17 as previously (and implausibly, given a 2026-10-05 review date) recorded — kiro.dev itself was egress-blocked this run, so the exact date is still not primary-sourced. Also corrected: the managed preference domain referenced in the update-management doc is dev.kiro.desktop, not dev.kiro.cli, and it is scoped only to the desktop IDE's auto-updater (keys UpdateUrl, UpdateMode — UpdateMode='none' always disables updates regardless of UpdateUrl). Per-user CLI settings live at ~/.kiro/settings/cli.json (plain JSON). Fleet-wide 'permission policies' described under kiro.dev/docs/enterprise/governance/permissions/ read as a cloud/admin-console mechanism, not a local macOS file. No confirmed device-level managed-settings file/domain for general CLI policy — needs more research before adding outputs.",
+      "notes": "CORRECTED again this review: a French-locale kiro.dev page (kiro.dev itself remains unreachable in English for a direct raw fetch) describes a real local managed-policy file — /Library/Application Support/Kiro/managed-settings.json — deployable via Jamf/Kandji and applying to 'every Kiro surface on the machine' including the CLI, with a restart required to reload; this supersedes last review's dev.kiro.desktop/auto-updater-only conclusion for general CLI policy, though it should still be re-confirmed from an English-language primary source. Documented rule semantics: the admin layer can only set deny/ask (never allow), and deny/ask always win regardless of scope — a good match for Mimir's restrictive-wins default. User-level policy lives at ~/.kiro/settings/permissions.yaml (deny/ask/allow), alongside the existing per-user CLI settings at ~/.kiro/settings/cli.json. Kiro CLI remains AWS's rebrand of Amazon Q Developer CLI; the exact rebrand date is still unconfirmed from a primary source. This is a strong 'supported' candidate once re-confirmed directly, but /Library/Application Support/Kiro/ is not yet in Mimir's compiled-in path allowlist, so no output is added here — see PR 'Needs Mimir change'.",
       "outputs": [],
       "detect": {
         "executables": ["/opt/homebrew/bin/kiro", "/usr/local/bin/kiro"],
         "processNames": ["kiro"],
-        "userConfigPaths": ["~/.kiro/settings/cli.json", "~/.kiro/settings/mcp.json"]
+        "userConfigPaths": ["~/.kiro/settings/cli.json", "~/.kiro/settings/mcp.json", "~/.kiro/settings/permissions.yaml"]
       }
     },
     {
@@ -372,9 +384,9 @@
       "displayName": "Droid CLI",
       "vendor": "Factory AI",
       "status": "planned",
-      "lastReviewed": "2026-10-05",
+      "lastReviewed": "2026-10-12",
       "documentation": ["https://docs.factory.ai/cli/getting-started/quickstart", "https://factory.ai/product/cli", "https://docs.factory.ai/enterprise/hierarchical-settings-and-org-control"],
-      "notes": "Terminal coding agent from Factory AI; installed via install script, Homebrew cask (droid) or npm. Settings at ~/.factory/settings.json with a ~/.factory/settings.local.json override and a project-level .factory/settings.local.json. New this review: an 'Enterprise Controls & Managed Settings' doc describes a 4-level settings hierarchy (Org > Folder > Project > User), each level a .factory/ folder with its own settings.json, covering model policy, network restrictions and autonomy ceilings — org level is admin-owned and highest-priority among them. This reads as org/cloud-distributed configuration (a central bundle or config endpoint), not a macOS-device/MDM-dropped file — still not a 'supported' candidate, but no longer 'no admin mechanism found'. Exact key names and precedence vs. CLI flags are unconfirmed (docs.factory.ai access was blocked this run; based on search snippets) — needs a direct fetch before adding outputs.",
+      "notes": "Terminal coding agent from Factory AI; installed via install script, Homebrew cask (droid) or npm. Settings at ~/.factory/settings.json with a ~/.factory/settings.local.json override and a project-level .factory/settings.local.json. A 4-level settings hierarchy (Org > Folder > Project > User), each level a .factory/ folder with its own settings.json, covers model policy, network restrictions and autonomy ceilings — org level is admin-owned and highest-priority. CONFIRMED this review (WebSearch snippets, docs.factory.ai still blocked for a direct fetch): a key named maxAutonomyLevel is an org-level hard cap that clamps the user's own autonomyLevel even if the user sets it higher (limit/kill-switch style), and command allow/deny lists 'accumulate across levels' rather than override. This still reads as org/cloud-distributed configuration (synced from a cloud endpoint), not a macOS-device/MDM-dropped local file — still not a 'supported' candidate. Needs a direct fetch of docs.factory.ai before adding outputs or mergeRules.",
       "outputs": [],
       "detect": {
         "executables": ["~/.npm-global/bin/droid", "/opt/homebrew/bin/droid", "/usr/local/bin/droid"],
@@ -387,9 +399,9 @@
       "displayName": "Amp CLI",
       "vendor": "Sourcegraph",
       "status": "planned",
-      "lastReviewed": "2026-10-05",
+      "lastReviewed": "2026-10-12",
       "documentation": ["https://ampcode.com/manual", "https://ampcode.com/news/towards-a-new-cli", "https://github.com/sourcegraph/amp-examples-and-guides", "https://ampcode.com/news/enterprise-managed-settings", "https://ampcode.com/docs/cli/settings"],
-      "notes": "CHANGED since last review: Terminal coding agent from Sourcegraph; npm package @ampcode/cli (formerly @sourcegraph/amp, still supported), now a single-file Bun-compiled executable. Global config at ~/.config/amp/settings.json/.jsonc; workspace .amp/settings.json overrides it (searched upward to repo root), except keymaps. A genuine OS-level managed-settings file is now documented: macOS /Library/Application Support/ampcode/managed-settings.json (Linux /etc/ampcode/managed-settings.json, Windows C:\\ProgramData\\ampcode\\managed-settings.json), with keys amp.mcpServers, amp.mcpPermissions (allow/block MCP servers) and amp.permissions (allow/block bash command patterns), plus the ability to override any other setting. This directly supersedes the prior 'not a device-level file' conclusion and is a genuine 'supported' candidate — but /Library/Application Support/ampcode/ is not yet in Mimir's compiled-in path allowlist, so no output is added here (see PR notes, Needs Mimir change). ampcode.com was egress-blocked for a direct fetch this run (based on search snippets of the two new URLs above); precedence of managed-settings.json vs. user/workspace settings and the exact allow/deny semantics of amp.mcpServers should be re-confirmed with a direct fetch before adding mergeRules.",
+      "notes": "Terminal coding agent from Sourcegraph; npm package @ampcode/cli (formerly @sourcegraph/amp, still supported), now a single-file Bun-compiled executable. Global config at ~/.config/amp/settings.json/.jsonc; workspace .amp/settings.json overrides it (searched upward to repo root, workspace > user except keymaps). A genuine OS-level managed-settings file is documented: macOS /Library/Application Support/ampcode/managed-settings.json (Linux /etc/ampcode/managed-settings.json, Windows C:\\ProgramData\\ampcode\\managed-settings.json), same schema as user settings and able to 'override any other Amp setting.' CONFIRMED this review via WebSearch-quoted text from https://ampcode.com/news/enterprise-managed-settings and https://ampcode.com/docs/cli/settings (ampcode.com itself is still unreachable for a direct fetch): amp.mcpServers is a grant list (union); amp.mcpPermissions is a first-match-wins ordered rule list matching MCP servers by url (remote) or command/args (local), defaulting to allow when nothing matches — a restriction mechanism where rule order matters, so a straight union is not quite right; amp.permissions is a similar first-match-wins rule list for Bash command patterns. Precise managed-settings-vs-workspace precedence is still only strongly implied ('override any other setting'), not stated as an explicit ordered list — recommend one more direct-fetch pass to pin that down before adding mergeRules. This remains a strong 'supported' candidate, but /Library/Application Support/ampcode/ is not yet in Mimir's compiled-in path allowlist, so no output is added here — see PR 'Needs Mimir change'.",
       "outputs": [],
       "detect": {
         "executables": ["~/.npm-global/bin/amp", "/opt/homebrew/bin/amp", "/usr/local/bin/amp"],
@@ -402,15 +414,17 @@
       "displayName": "Warp (Agent Mode)",
       "vendor": "Warp",
       "status": "planned",
-      "lastReviewed": "2026-09-28",
+      "lastReviewed": "2026-10-12",
       "documentation": [
         "https://docs.warp.dev/terminal/settings/",
+        "https://docs.warp.dev/terminal/settings/file-locations/",
         "https://docs.warp.dev/agent-platform/warp-agents/interacting-with-agents/terminal-and-agent-modes",
         "https://docs.warp.dev/enterprise/team-management/admin-panel/"
       ],
-      "notes": "New entry. Native macOS terminal with a built-in Agent Mode. User settings live in ~/.warp/settings.toml (TOML, not JSON). Enterprise policy (agent autonomy, model allowlists, secret redaction, sharing) is enforced through a cloud-based Admin Panel for teams, not a macOS device-level MDM profile or managed-preferences domain — not a managed-config candidate until an on-device mechanism is documented. App bundle ID not confirmed from an official source this run, so omitted from detect.",
+      "notes": "Native macOS terminal with a built-in Agent Mode. User settings live in ~/.warp/settings.toml (TOML, not JSON). Enterprise policy (agent autonomy, model allowlists, secret redaction, sharing) is enforced through a cloud-based Admin Panel for teams, not a macOS device-level MDM profile or managed-preferences domain — not a managed-config candidate until an on-device mechanism is documented; policy-managed settings are shown greyed-out in the app but pushed from the cloud, not a local file. CONFIRMED this review via WebSearch-quoted text from Warp's own file-locations doc (docs.warp.dev still blocked for a direct fetch): the macOS app bundle ID for the Stable build is dev.warp.Warp-Stable, previously only a third-party-sourced guess — added to detect below.",
       "outputs": [],
       "detect": {
+        "appBundleIDs": ["dev.warp.Warp-Stable"],
         "userConfigPaths": ["~/.warp/settings.toml"]
       }
     },
