@@ -56,6 +56,7 @@ The private key is kept offline and never used in CI.
 | `cortex-code` | Cortex Code CLI | planned |
 | `deepseek-harness` | DeepSeek Harness | planned |
 | `pi` | Pi | planned |
+| `antigravity-cli` | Antigravity CLI | planned |
 
 ## Updating
 
