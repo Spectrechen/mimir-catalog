@@ -55,6 +55,7 @@ The private key is kept offline and never used in CI.
 | `kilo-cli` | Kilo CLI | planned |
 | `cortex-code` | Cortex Code CLI | planned |
 | `deepseek-harness` | DeepSeek Harness | planned |
+| `pi` | Pi | planned |
 
 ## Updating
 
