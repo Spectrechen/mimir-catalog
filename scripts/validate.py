@@ -7,7 +7,9 @@ ALLOWED_PREFIXES = (
     "/Library/Application Support/opencode/",
     "/Library/Application Support/GeminiCli/",
     "/etc/codex/",
+    "/Library/Application Support/GitHubCopilot/",
     "/Library/Managed Preferences/com.anthropic.claudefordesktop.plist",
+    "/Library/Managed Preferences/com.todesktop.230313mzl4w4u92.plist",
 )
 STRATEGIES = {"union", "replace", "anyTrue", "anyFalse", "min", "max", "intersect", "strictest"}
 STATUSES = {"supported", "experimental", "planned"}
