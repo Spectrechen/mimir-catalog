@@ -57,6 +57,7 @@ The private key is kept offline and never used in CI.
 | `deepseek-harness` | DeepSeek Harness | planned |
 | `pi` | Pi | planned |
 | `antigravity-cli` | Antigravity CLI | planned |
+| `kimi-code` | Kimi Code CLI | planned |
 
 ## Updating
 
